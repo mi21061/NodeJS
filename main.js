@@ -131,6 +131,53 @@ function groupRankings(teamResults, rounds){
     return groupResults;
 }
 
+function draw(teamRangs){
+    pairs = {}
+    if(Math.random() < 0.5){ //izvuceni 0 i 6
+        if(teamRangs[0].group === teamRangs[6].group){
+            pairs[1] = [teamRangs[0].team, teamRangs[7].team];
+            pairs[3] = [teamRangs[1].team, teamRangs[6].team];
+        }
+        else{
+            pairs[1] = [teamRangs[0].team, teamRangs[6].team];
+            pairs[3] = [teamRangs[1].team, teamRangs[7].team];
+        }
+    }
+    else{ //izvuceni 0 i 7
+        if(teamRangs[0].group === teamRangs[7].group){
+            pairs[1] = [teamRangs[0].team, teamRangs[6].team];
+            pairs[3] = [teamRangs[1].team, teamRangs[7].team];
+        }
+        else{
+            pairs[1] = [teamRangs[0].team, teamRangs[7].team];
+            pairs[3] = [teamRangs[1].team, teamRangs[6].team];
+        }
+    }
+
+    if(Math.random() < 0.5){ //izvuceni 2 i 4
+        if(teamRangs[2].group === teamRangs[4].group){
+            pairs[2] = [teamRangs[2].team, teamRangs[5].team];
+            pairs[4] = [teamRangs[3].team, teamRangs[4].team];
+        }
+        else{
+            pairs[2] = [teamRangs[2].team, teamRangs[4].team];
+            pairs[4] = [teamRangs[3].team, teamRangs[5].team];
+        }
+    }
+    else{ //izvuceni 2 i 5
+        if(teamRangs[2].group === teamRangs[5].group){
+            pairs[2] = [teamRangs[2].team, teamRangs[4].team];
+            pairs[4] = [teamRangs[3].team, teamRangs[5].team];
+        }
+        else{
+            pairs[2] = [teamRangs[2].team, teamRangs[5].team];
+            pairs[4] = [teamRangs[3].team, teamRangs[4].team];
+        }
+    }
+
+    return pairs;
+}
+
 let worstRanking = 0;
 for (const groupName in groups){
     //najgori rang na FIBA
@@ -150,6 +197,7 @@ for(let i = 1; i <= rounds; i++){
         console.log("   Grupa "+groupName+":" );
         
         let rankingDiff = groups[groupName][0].FIBARanking - groups[groupName][i].FIBARanking;
+        
         getResult(groups[groupName][0].Team, groups[groupName][i].Team, rankingDiff, worstRanking, teamResults, i);
 
         //igraju 2 i 3, pa 1 i 3, pa 1 i 2
@@ -165,6 +213,7 @@ let groupId = 0;
 for(let groupName in groups){
     console.log('   Grupa '+groupName+'(Ime - pobede/porazi/bodovi/postignuti koševi/primljeni koševi/koš razlika)');
     for(let j = 0; j < groupStandings[0].length; j++){
+        groupStandings[groupId][j]["groupName"] = groupName;
         console.log((j+1)+". "+groupStandings[groupId][j].team+"     / "+
             groupStandings[groupId][j].wins+" / "+groupStandings[groupId][j].losses+
             " / "+groupStandings[groupId][j].points+" / "+groupStandings[groupId][j].ptsScoredSum+" / "
@@ -179,9 +228,10 @@ let teamRangs = [[], [], []];
 for(let i = 0; i < 3; i++){
     for (let j = 0; j < 3; j++){
         teamRangs[i].push({team : groupStandings[j][i].team,
-                              points : groupStandings[j][i].points,
-                              ptsScoredSum : groupStandings[j][i].ptsScoredSum,
-                              ptsDiff : (groupStandings[j][i].ptsScoredSum - groupStandings[j][i].ptsOppSum)});
+                           groupName : groupStandings[j][i].groupName,
+                           points : groupStandings[j][i].points,
+                           ptsScoredSum : groupStandings[j][i].ptsScoredSum,
+                           ptsDiff : (groupStandings[j][i].ptsScoredSum - groupStandings[j][i].ptsOppSum)});
     }
 }
 
@@ -218,3 +268,5 @@ console.log('Konacan plasman: ');
 for(let i = 0; i < teamRangs.length; i++){
     console.log((i+1)+". "+teamRangs[i].team);
 }
+
+console.log(draw(teamRangs));
