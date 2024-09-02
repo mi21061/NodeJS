@@ -9,11 +9,26 @@ function initialize_teamResults(teamResults, groups){
     }
 }
 
-function getPoints(probFactor, pointFactor){
-    return 65 + Math.ceil((Math.random() + probFactor) * pointFactor);
+function initialize_forms(){
+    forms = {};
+
+    for(teamCode in exibitions){
+        let score = exibitions[teamCode][0].Result.split("-");
+        let form = score[0] - score[1];
+
+        score = exibitions[teamCode][1].Result.split("-");
+        form += score[0] - score[1];
+
+        forms[teamCode] = form;
+    }
+    return forms;
 }
 
-function getResult(team1, team2, diff, worstRanking, teamResults, round){
+function getPoints(probFactor, pointFactor){
+    return 70 + Math.ceil((Math.random() + probFactor) * pointFactor);
+}
+
+function getResult(team1, code1, team2, code2, teamForms, diff, worstRanking, teamResults, round){
     let surrender = false;
     let winner = 0;
     let points1;
@@ -37,10 +52,15 @@ function getResult(team1, team2, diff, worstRanking, teamResults, round){
     else{
         //probFactor je u inverznoj relaciji sa razlikom
         //i najslabiji moze dobiti najjaceg
-        let probFactor = -diff/(worstRanking*1.95);
+        let probFactor = -diff/(worstRanking*2.5) + Math.max((teamForms[code1] - teamForms[code2]), 0)/200;
 
         points1 = getPoints(probFactor, 40);
         points2 = getPoints(-probFactor, 40);
+
+        //forma sve vise doprinosi kako imamo vise utakmica za uzorak
+        teamForms[code1] += Math.random() * (points1 - points2) / 50;
+        teamForms[code2] += Math.random() * (points2 - points1) / 50;
+
         //no ties
         if(points1 == points2){
             points1 += 1;
@@ -190,6 +210,7 @@ for (const groupName in groups){
 //broj kola
 const rounds = groups.A.length-1;
 let teamResults = {};
+let teamForms = initialize_forms();
 initialize_teamResults(teamResults, groups);
 for(let i = 1; i <= rounds; i++){
     console.log("Rezultati "+i+". kola:");
@@ -198,13 +219,13 @@ for(let i = 1; i <= rounds; i++){
         
         let rankingDiff = groups[groupName][0].FIBARanking - groups[groupName][i].FIBARanking;
         
-        getResult(groups[groupName][0].Team, groups[groupName][i].Team, rankingDiff, worstRanking, teamResults, i);
+        getResult(groups[groupName][0].Team, groups[groupName][0].ISOCode, groups[groupName][i].Team, groups[groupName][i].ISOCode, teamForms, rankingDiff, worstRanking, teamResults, i);
 
         //igraju 2 i 3, pa 1 i 3, pa 1 i 2
         let j = i - 1 > 0 ? i-1 : 3;
         let k = i + 1 < 4 ? i+1 : 1;
         rankingDiff = groups[groupName][j].FIBARanking - groups[groupName][k].FIBARanking;
-        getResult(groups[groupName][j].Team, groups[groupName][k].Team, rankingDiff, worstRanking, teamResults, i);
+        getResult(groups[groupName][j].Team, groups[groupName][j].ISOCode, groups[groupName][k].Team, groups[groupName][k].ISOCode, teamForms, rankingDiff, worstRanking, teamResults, i);
     }
 }
 const groupStandings = groupRankings(teamResults, rounds);
@@ -269,4 +290,12 @@ for(let i = 0; i < teamRangs.length; i++){
     console.log((i+1)+". "+teamRangs[i].team);
 }
 
-console.log(draw(teamRangs));
+let Draw = draw(teamRangs);
+console.log("\nZreb:");
+for (let i = 1; i<5; i++){
+    if(i == 3){
+        console.log('----------------------');
+    }
+    console.log(Draw[i][0]+" : "+Draw[i][1]);
+}
+
