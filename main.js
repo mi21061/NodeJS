@@ -25,7 +25,7 @@ function initialize_forms(){
 }
 
 function getPoints(probFactor, pointFactor){
-    return 70 + Math.ceil((Math.random() + probFactor) * pointFactor);
+    return 75 + Math.ceil((Math.random() + probFactor) * pointFactor);
 }
 
 function getResult(team1, code1, team2, code2, teamForms, diff, worstRanking, teamResults, round){
@@ -51,20 +51,30 @@ function getResult(team1, code1, team2, code2, teamForms, diff, worstRanking, te
     }
     else{
         //probFactor je u inverznoj relaciji sa razlikom
-        //i najslabiji moze dobiti najjaceg
-        let probFactor = -diff/(worstRanking*2.5) + Math.max((teamForms[code1] - teamForms[code2]), 0)/200;
+        let probFactor = -diff/worstRanking*0.3 + 
+        (teamForms[code1] - teamForms[code2])/
+        (Math.abs(teamForms[code1]) + Math.abs(teamForms[code2])) * 0.2;
 
-        points1 = getPoints(probFactor, 40);
-        points2 = getPoints(-probFactor, 40);
-
-        //forma sve vise doprinosi kako imamo vise utakmica za uzorak
-        teamForms[code1] += Math.random() * (points1 - points2) / 50;
-        teamForms[code2] += Math.random() * (points2 - points1) / 50;
+        points1 = getPoints(probFactor, 25);
+        points2 = getPoints(-probFactor, 25);
 
         //no ties
         if(points1 == points2){
             points1 += 1;
         }
+
+        //sto je protivnik jaci to vise doprinosi formi u slucaju pobede
+        let strengthFactor1 = 0.5 - diff / (worstRanking*2);
+        let strengthFactor2 = 0.5 + diff / (worstRanking*2);
+
+        //u slucaju poraza jacina protivnika smanjuje pad forme
+        strengthFactor1 = points1 - points2 > 0 ? strengthFactor1 : 1-strengthFactor1;
+        strengthFactor2 = points2 - points1 > 0 ? strengthFactor2 : 1-strengthFactor2;
+
+        //forma sve vise doprinosi kako imamo vise utakmica za uzorak
+        teamForms[code1] += strengthFactor1 * (points1 - points2);
+        teamForms[code2] += strengthFactor2 * (points2 - points1);
+
         winner = points1 - points2 > 0 ? 1 : 2;
         console.log("       "+team1+" - "+team2+" (" + points1 + " : " + points2 + ")");
     }
@@ -113,6 +123,7 @@ function groupRankings(teamResults, rounds){
         teamCounter++;
     }
     
+    //sortiraj po poenima
     for (let i = 0; i < groupResults.length; i++){
         groupResults[i].sort((team1, team2) => (team1.points > team2.points) ? -1 : 1);
     }
@@ -122,6 +133,7 @@ function groupRankings(teamResults, rounds){
         while (j < groupResults[i].length-1){
             let k = j;
             let team0 = -1;
+            //dok god timovi imaju isti broj bodova ažuriraj međusobnu koš razliku
             while(groupResults[i][k].points == groupResults[i][++k].points){
                 let team1 = groupResults[i][k-1];
                 let team2 = groupResults[i][k];
@@ -198,6 +210,70 @@ function draw(teamRangs){
     return pairs;
 }
 
+function playElimination(Draw, teamCodeRankingMap, teamForms, worstRanking, teamResults){
+    let roundNames = ['cetvrtfinala:', 'polufinala:', 'za 3:', 'za 1:'];
+    let semiFinal = false;
+    let finalPair = [];
+    let first, second, third;
+    for (let round = 4; round < 8; round++) {
+        if(round === 5){
+            semiFinal = true;
+        }
+        console.log('\nRezultati '+roundNames[round-4])
+        let newPair = [];
+        let newDraw = {};
+        for(pairNum in Draw){
+            let pair = Draw[pairNum];
+    
+            let team1 = pair[0];
+            let teamCode1 = teamCodeRankingMap[team1].code;
+            let teamRank1 = teamCodeRankingMap[team1].rank;
+    
+            let team2 = pair[1];
+            let teamCode2 = teamCodeRankingMap[team2].code;
+            let teamRank2 = teamCodeRankingMap[team2].rank;
+    
+            getResult(team1, teamCode1, team2, teamCode2, teamForms, 
+                         teamRank1 - teamRank2, worstRanking, teamResults, round);
+            
+            //postavi medlaje
+            if(round === 6){
+                third = teamResults[team1][round-1].win ? team1 : team2;
+            }
+            if(round === 7){
+                first = teamResults[team1][round-1].win ? team1 : team2;
+                second = teamResults[team1][round-1].win ? team2 : team1;
+            }
+
+            //ako je ostalo samo finale da se odigra
+            if (finalPair.length !== 0 && finalPair.length !== 1){
+                newDraw[1] = finalPair;
+                continue;
+            }
+            
+            //ako je polufinale uzmi gubitnicki par, a postavi finalni
+            if (semiFinal) {
+                newPair.push(teamResults[team1][round-1].win ? team2 : team1);
+                finalPair.push(teamResults[team1][round-1].win ? team1 : team2);
+            } else {
+                newPair.push(teamResults[team1][round-1].win ? team1 : team2);
+            }
+
+            if (pairNum % 2 === 0){
+                newDraw[pairNum / 2] = newPair;
+                newPair = [];
+            }
+            
+        }
+        semiFinal = false;
+        Draw = newDraw;
+        console.log('-----------------------------')
+    }
+    console.log("\n1. "+first);
+    console.log("2. "+second);
+    console.log("3. "+third);
+}
+
 let worstRanking = 0;
 for (const groupName in groups){
     //najgori rang na FIBA
@@ -211,21 +287,50 @@ for (const groupName in groups){
 const rounds = groups.A.length-1;
 let teamResults = {};
 let teamForms = initialize_forms();
+let teamCodeRankingMap = {};
 initialize_teamResults(teamResults, groups);
 for(let i = 1; i <= rounds; i++){
     console.log("Rezultati "+i+". kola:");
     for (const groupName in groups){
         console.log("   Grupa "+groupName+":" );
         
-        let rankingDiff = groups[groupName][0].FIBARanking - groups[groupName][i].FIBARanking;
-        
-        getResult(groups[groupName][0].Team, groups[groupName][0].ISOCode, groups[groupName][i].Team, groups[groupName][i].ISOCode, teamForms, rankingDiff, worstRanking, teamResults, i);
+        let team1 = groups[groupName][0].Team;
+        let teamCode1 = groups[groupName][0].ISOCode;
+        let teamRanking1 = groups[groupName][0].FIBARanking;
+
+        let team2 = groups[groupName][i].Team;
+        let teamCode2 = groups[groupName][i].ISOCode;
+        let teamRanking2 = groups[groupName][i].FIBARanking;
+
+        let rankingDiff = teamRanking1 - teamRanking2;
+        if(i == 1){ //inicijalizuje se mapa samo na pocetku
+            teamCodeRankingMap[team1] = {code : teamCode1, 
+                                         rank : teamRanking1};
+            teamCodeRankingMap[team2] = {code : teamCode2, 
+                                         rank : teamRanking2};
+        }
+    
+        getResult(team1, teamCode1, team2, teamCode2, teamForms, rankingDiff, worstRanking, teamResults, i);
 
         //igraju 2 i 3, pa 1 i 3, pa 1 i 2
         let j = i - 1 > 0 ? i-1 : 3;
         let k = i + 1 < 4 ? i+1 : 1;
-        rankingDiff = groups[groupName][j].FIBARanking - groups[groupName][k].FIBARanking;
-        getResult(groups[groupName][j].Team, groups[groupName][j].ISOCode, groups[groupName][k].Team, groups[groupName][k].ISOCode, teamForms, rankingDiff, worstRanking, teamResults, i);
+        team1 = groups[groupName][j].Team;
+        teamCode1 = groups[groupName][j].ISOCode;
+        teamRanking1 = groups[groupName][j].FIBARanking;
+
+        team2 = groups[groupName][k].Team;
+        teamCode2 = groups[groupName][k].ISOCode;
+        teamRanking2 = groups[groupName][k].FIBARanking;
+
+        rankingDiff = teamRanking1 - teamRanking2;
+        if(i == 1){
+            teamCodeRankingMap[team1] = {code : teamCode1, 
+                                         rank : teamRanking1};
+            teamCodeRankingMap[team2] = {code : teamCode2, 
+                                         rank : teamRanking2};
+        }
+        getResult(team1, teamCode1, team2, teamCode2, teamForms, rankingDiff, worstRanking, teamResults, i);
     }
 }
 const groupStandings = groupRankings(teamResults, rounds);
@@ -298,4 +403,6 @@ for (let i = 1; i<5; i++){
     }
     console.log(Draw[i][0]+" : "+Draw[i][1]);
 }
+
+playElimination(Draw, teamCodeRankingMap, teamForms, worstRanking, teamResults);
 
